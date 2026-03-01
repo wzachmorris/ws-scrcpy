@@ -80,6 +80,8 @@ body.shell {
 
 body.stream {
     background-color: var(--stream-bg-color);
+    touch-action: none;
+    overflow: hidden;
 }
 
 .terminal-container {
@@ -115,6 +117,10 @@ body.stream {
 .touch-layer {
     position: absolute;
     z-index: 1;
+    touch-action: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 .video {

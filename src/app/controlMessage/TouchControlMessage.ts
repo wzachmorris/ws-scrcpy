@@ -49,11 +49,31 @@ export class TouchControlMessage extends ControlMessage {
         offset = buffer.writeUInt8(this.action, offset);
         offset = buffer.writeUInt32BE(0, offset); // pointerId is `long` (8 bytes) on java side
         offset = buffer.writeUInt32BE(this.pointerId, offset);
-        offset = buffer.writeUInt32BE(this.position.point.x, offset);
-        offset = buffer.writeUInt32BE(this.position.point.y, offset);
-        offset = buffer.writeUInt16BE(this.position.screenSize.width, offset);
-        offset = buffer.writeUInt16BE(this.position.screenSize.height, offset);
-        offset = buffer.writeUInt16BE(this.pressure * TouchControlMessage.MAX_PRESSURE_VALUE, offset);
+        // Validate and clamp coordinates to valid ranges
+        const x = Math.max(0, Math.min(0xFFFFFFFF, Math.floor(this.position.point.x)));
+        const y = Math.max(0, Math.min(0xFFFFFFFF, Math.floor(this.position.point.y)));
+        const width = Math.max(0, Math.min(0xFFFF, Math.floor(this.position.screenSize.width)));
+        const height = Math.max(0, Math.min(0xFFFF, Math.floor(this.position.screenSize.height)));
+        const pressureValue = Math.max(0, Math.min(0xFFFF, Math.floor(this.pressure * TouchControlMessage.MAX_PRESSURE_VALUE)));
+
+        // Log invalid values for debugging
+        if (isNaN(x) || isNaN(y) || isNaN(width) || isNaN(height)) {
+            console.error('[TouchControlMessage] Invalid values:', {
+                x: this.position.point.x,
+                y: this.position.point.y,
+                width: this.position.screenSize.width,
+                height: this.position.screenSize.height,
+                pressure: this.pressure,
+                buttons: this.buttons
+            });
+            return buffer; // Return empty buffer if invalid
+        }
+
+        offset = buffer.writeUInt32BE(x, offset);
+        offset = buffer.writeUInt32BE(y, offset);
+        offset = buffer.writeUInt16BE(width, offset);
+        offset = buffer.writeUInt16BE(height, offset);
+        offset = buffer.writeUInt16BE(pressureValue, offset);
         buffer.writeUInt32BE(this.buttons, offset);
         return buffer;
     }
