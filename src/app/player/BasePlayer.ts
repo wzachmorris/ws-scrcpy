@@ -213,11 +213,11 @@ export abstract class BasePlayer extends TypedEmitter<PlayerEvents> {
         if (!window.localStorage) {
             return false;
         }
-        let parsedValue = false;
+        let parsedValue = true;
         const key = `${this.getFullStorageKey(storageKeyPrefix, udid, displayInfo)}:fit`;
         const saved = window.localStorage.getItem(key);
         if (!saved) {
-            return false;
+            return true; // default to fit-to-screen
         }
         try {
             parsedValue = JSON.parse(saved);
