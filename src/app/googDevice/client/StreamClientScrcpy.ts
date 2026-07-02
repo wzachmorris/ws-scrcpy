@@ -59,6 +59,7 @@ export class StreamClientScrcpy
     private player?: BasePlayer;
     private filePushHandler?: FilePushHandler;
     private fitToScreen?: boolean;
+    private resizeTimer?: number;
     private readonly streamReceiver: StreamReceiverScrcpy;
 
     public static registerPlayer(playerClass: PlayerClass): void {
@@ -144,7 +145,54 @@ export class StreamClientScrcpy
         const { udid, player: playerName } = this.params;
         this.startStream({ udid, player, playerName, fitToScreen, videoSettings });
         this.setBodyClass('stream');
+        this.addViewportResizeListeners();
     }
+
+    // Re-fit the video when the visible viewport changes: mobile URL bar
+    // collapsing/expanding, rotation, or a desktop window resize.
+    private addViewportResizeListeners(): void {
+        const vv = (window as unknown as { visualViewport?: EventTarget }).visualViewport;
+        if (vv) {
+            vv.addEventListener('resize', this.onViewportResize);
+        }
+        window.addEventListener('resize', this.onViewportResize);
+        window.addEventListener('orientationchange', this.onViewportResize);
+    }
+
+    private removeViewportResizeListeners(): void {
+        const vv = (window as unknown as { visualViewport?: EventTarget }).visualViewport;
+        if (vv) {
+            vv.removeEventListener('resize', this.onViewportResize);
+        }
+        window.removeEventListener('resize', this.onViewportResize);
+        window.removeEventListener('orientationchange', this.onViewportResize);
+    }
+
+    private onViewportResize = (): void => {
+        if (this.resizeTimer) {
+            window.clearTimeout(this.resizeTimer);
+        }
+        // Debounced: the URL bar collapse animates and fires many resize events,
+        // and every bounds change restarts the device-side video encoder.
+        this.resizeTimer = window.setTimeout(this.refitToScreen, 500);
+    };
+
+    private refitToScreen = (): void => {
+        if (!this.player || !this.fitToScreen) {
+            return;
+        }
+        const newBounds = this.getMaxSize();
+        if (!newBounds) {
+            return;
+        }
+        const currentSettings = this.player.getVideoSettings();
+        if (currentSettings.bounds && currentSettings.bounds.equals(newBounds)) {
+            return;
+        }
+        const updated = StreamClientScrcpy.createVideoSettingsWithBounds(currentSettings, newBounds);
+        this.player.setVideoSettings(updated, this.fitToScreen, false);
+        this.sendNewVideoSetting(updated);
+    };
 
     public static parseParameters(params: URLSearchParams): ParamsStreamScrcpy {
         const typedParams = super.parseParameters(params);
@@ -259,6 +307,10 @@ export class StreamClientScrcpy
         this.filePushHandler = undefined;
         this.touchHandler?.release();
         this.touchHandler = undefined;
+        this.removeViewportResizeListeners();
+        if (this.resizeTimer) {
+            window.clearTimeout(this.resizeTimer);
+        }
     };
 
     public startStream({ udid, player, playerName, videoSettings, fitToScreen }: StartParams): void {

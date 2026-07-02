@@ -69,8 +69,12 @@ body {
     position: absolute;
     margin: 0;
     height: 100%;
+    /* dvh tracks the mobile browser's collapsing URL bar; 100% is the fallback */
+    height: 100dvh;
     width: 100%;
+    width: 100dvw;
     overflow: hidden;
+    overscroll-behavior: none;
 }
 
 
