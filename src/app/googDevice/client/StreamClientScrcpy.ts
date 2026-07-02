@@ -146,7 +146,32 @@ export class StreamClientScrcpy
         this.startStream({ udid, player, playerName, fitToScreen, videoSettings });
         this.setBodyClass('stream');
         this.addViewportResizeListeners();
+        this.addFirstTapFullscreen();
     }
+
+    // Browsers only allow entering fullscreen from a user gesture, so the nav
+    // bar can't be hidden on load — instead go fullscreen on the first tap.
+    // No-op where unsupported (iPhone Safari) or already standalone (PWA).
+    private addFirstTapFullscreen(): void {
+        const el = document.documentElement as HTMLElement & { requestFullscreen?: () => Promise<void> };
+        if (typeof el.requestFullscreen !== 'function') {
+            return;
+        }
+        const standalone =
+            window.matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches ||
+            (navigator as unknown as { standalone?: boolean }).standalone === true;
+        if (standalone || !('ontouchstart' in window)) {
+            return;
+        }
+        document.addEventListener('touchend', this.onFirstTap, true);
+    }
+
+    private onFirstTap = (): void => {
+        document.removeEventListener('touchend', this.onFirstTap, true);
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(() => undefined);
+        }
+    };
 
     // Re-fit the video when the visible viewport changes: mobile URL bar
     // collapsing/expanding, rotation, or a desktop window resize.
@@ -308,6 +333,7 @@ export class StreamClientScrcpy
         this.touchHandler?.release();
         this.touchHandler = undefined;
         this.removeViewportResizeListeners();
+        document.removeEventListener('touchend', this.onFirstTap, true);
         if (this.resizeTimer) {
             window.clearTimeout(this.resizeTimer);
         }
